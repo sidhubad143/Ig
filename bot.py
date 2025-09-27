@@ -1,8 +1,8 @@
 """
 Instagram DM Command Bot (demo)
 - Responds to DM commands starting with '.'
-- .ping / .help => open for everyone
-- .spam / .like => only AUTHORIZED_USERS
+- .ping / .help => sabhi users ke liye
+- .spam / .like => sirf AUTHORIZED_USERS
 - For testing/demo purposes only (risk of IG restrictions!)
 
 pip install instagrapi
@@ -22,7 +22,7 @@ PASSWORD = "abhi@50"           # apna demo password
 SESSION_FILE = "session.json"
 PROCESSED_FILE = "processed_msgs.json"
 
-POLL_INTERVAL = 12             # seconds between inbox polls
+POLL_INTERVAL = 60             # seconds between inbox polls (increase for safety)
 AUTHORIZED_USERS = [           # allowed usernames (without @)
     "abhi_9_8__"
 ]
@@ -196,10 +196,13 @@ def poll_inbox_and_handle(cl):
                     processed.add(msg_id)
 
             save_processed(processed)
+            # safe poll delay
+            time.sleep(POLL_INTERVAL + random.uniform(0, 5))
+
         except Exception as e:
             print("[!] Inbox polling error:", e)
-
-        time.sleep(POLL_INTERVAL + random.uniform(0, 3))
+            # longer cooldown on errors
+            time.sleep(120)
 
 def main():
     print("=== Instagram DM command-bot (demo) ===")
