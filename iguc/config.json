@@ -1,0 +1,15 @@
+{
+  "username": "REPLACE_WITH_IG_USERNAME",
+  "password": "REPLACE_WITH_IG_PASSWORD",
+  "session_file": "iguc/data/session.json",
+  "processed_file": "iguc/data/processed_msgs.json",
+  "like_history_file": "iguc/data/like_history.json",
+  "poll_interval": 60,
+  "authorized_users": ["abhi_9_8__"],
+  "spam_enabled": false,
+  "max_spam": 2,
+  "max_likes_per_command": 3,
+  "daily_like_limit": 10,
+  "like_delay_min": 10,
+  "like_delay_max": 30
+}
