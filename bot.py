@@ -1,7 +1,8 @@
 """
 Instagram DM Command Bot (demo)
 - Responds to DM commands starting with '.'
-- Only allows commands from AUTHORIZED_USERS
+- .ping / .help => open for everyone
+- .spam / .like => only AUTHORIZED_USERS
 - For testing/demo purposes only (risk of IG restrictions!)
 
 pip install instagrapi
@@ -84,38 +85,33 @@ def process_command(cl, text, from_user_id, processed_set):
 
     print(f"[{datetime.now().isoformat()}] Command from {sender_username}: {text.strip()}")
 
-    if sender_username not in AUTHORIZED_USERS:
-        print(f"[!] Unauthorized command attempt by {sender_username}")
-        try:
-            cl.direct_send("You are not authorized to control this bot.", [from_user_id])
-        except Exception:
-            pass
-        return
-
-    # .ping
+    # -------- OPEN COMMANDS (sab ke liye) --------
     if cmd == ".ping":
-        t0 = time.time()
         try:
             cl.direct_send("pong", [from_user_id])
-            latency = (time.time() - t0) * 1000.0
-            print(f"[+] Replied pong ({int(latency)} ms)")
+            print(f"[+] Pong sent to {sender_username}")
         except Exception as e:
             print("Error replying ping:", e)
         return
 
-    # .help
     if cmd == ".help":
         help_text = (
             "Demo bot commands:\n"
-            ".ping - check bot is alive\n"
-            f".spam <count> <text> - send text (count <= {MAX_SPAM})\n"
-            f".like <username> <n> - like <n> posts (n <= {MAX_LIKES})\n"
-            ".help - show this message\n"
+            ".ping - check bot is alive (everyone)\n"
+            ".help - show this message (everyone)\n"
+            f".spam <count> <text> - only authorized (count <= {MAX_SPAM})\n"
+            f".like <username> <n> - only authorized (n <= {MAX_LIKES})\n"
         )
         try:
             cl.direct_send(help_text, [from_user_id])
         except Exception as e:
             print("Error sending help:", e)
+        return
+
+    # -------- CONTROL COMMANDS (sirf authorized) --------
+    if sender_username not in AUTHORIZED_USERS:
+        cl.direct_send("You are not authorized to run this command.", [from_user_id])
+        print(f"[!] Unauthorized attempt by {sender_username}")
         return
 
     # .spam
@@ -183,7 +179,7 @@ def poll_inbox_and_handle(cl):
     print(f"[*] Loaded {len(processed)} processed message IDs.")
     while True:
         try:
-            threads = cl.direct_threads(amount=5)  # latest 5
+            threads = cl.direct_threads(amount=5)
             for thread in threads:
                 msgs = getattr(thread, "messages", []) or getattr(thread, "items", [])
                 for msg in msgs:
