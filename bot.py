@@ -22,7 +22,7 @@ PROCESSED_FILE = "processed_msgs.json"
 
 POLL_INTERVAL = 12          # seconds between inbox polls (increase to be safer)
 AUTHORIZED_USERS = [        # usernames allowed to control the bot
-    "abhi_9_8__"
+    "abhi.9_8_"
 ]
 
 MAX_SPAM = 5                # absolute maximum messages allowed for .spam
