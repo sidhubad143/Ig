@@ -1,10 +1,11 @@
 """
-instabot_command_bot.py
-Demo Instagram "userbot" that responds to DM commands (prefix '.').
-USE ONLY ON A TEST/DEMO ACCOUNT.
+Instagram DM Command Bot (demo)
+- Responds to DM commands starting with '.'
+- Only allows commands from AUTHORIZED_USERS
+- For testing/demo purposes only (risk of IG restrictions!)
 
 pip install instagrapi
-python instabot_command_bot.py
+python3 bot.py
 """
 
 import time
@@ -15,18 +16,18 @@ from datetime import datetime
 from instagrapi import Client
 
 # -------------- CONFIG --------------
-USERNAME = "abhi_9_8__"
-PASSWORD = "abhi@50"
+USERNAME = "abhi_9_8__"        # apna demo username
+PASSWORD = "abhi@50"           # apna demo password
 SESSION_FILE = "session.json"
 PROCESSED_FILE = "processed_msgs.json"
 
-POLL_INTERVAL = 12          # seconds between inbox polls (increase to be safer)
-AUTHORIZED_USERS = [        # usernames allowed to control the bot
+POLL_INTERVAL = 12             # seconds between inbox polls
+AUTHORIZED_USERS = [           # allowed usernames (without @)
     "abhi.9_8_"
 ]
 
-MAX_SPAM = 5                # absolute maximum messages allowed for .spam
-MAX_LIKES = 3               # absolute maximum likes per .like command
+MAX_SPAM = 5                   # max messages allowed for .spam
+MAX_LIKES = 3                  # max likes per .like
 # -------------------------------------
 
 def human_sleep(min_s=2, max_s=6):
@@ -51,7 +52,6 @@ def save_processed(s):
 
 def login_or_load_session():
     cl = Client()
-    # try to reuse previous settings/session
     if os.path.exists(SESSION_FILE):
         try:
             cl.load_settings(SESSION_FILE)
@@ -65,6 +65,7 @@ def login_or_load_session():
     else:
         cl.login(USERNAME, PASSWORD)
         print("[*] Logged in (fresh).")
+
     try:
         cl.dump_settings(SESSION_FILE)
         print(f"[*] Session saved -> {SESSION_FILE}")
@@ -72,22 +73,10 @@ def login_or_load_session():
         print("[!] Couldn't save session:", e)
     return cl
 
-def username_allowed(cl, user_id):
-    try:
-        uname = cl.username_from_user_id(user_id)
-        return uname in AUTHORIZED_USERS
-    except Exception:
-        return False
-
-def process_command(cl, text, from_user_id, thread_id, processed_set):
-    # commands must start with dot
-    if not text or not text.strip().startswith("."):
-        return
-
+def process_command(cl, text, from_user_id, processed_set):
     parts = text.strip().split()
     cmd = parts[0].lower()
 
-    # Map user_id -> username (safe attempt)
     try:
         sender_username = cl.username_from_user_id(from_user_id)
     except Exception:
@@ -95,11 +84,10 @@ def process_command(cl, text, from_user_id, thread_id, processed_set):
 
     print(f"[{datetime.now().isoformat()}] Command from {sender_username}: {text.strip()}")
 
-    # SECURITY: only allow commands from authorized usernames
     if sender_username not in AUTHORIZED_USERS:
-        print(f"[!] Unauthorized command attempt by {sender_username} — ignoring.")
+        print(f"[!] Unauthorized command attempt by {sender_username}")
         try:
-            cl.direct_send(text="You are not authorized to control this bot.", user_ids=[from_user_id])
+            cl.direct_send("You are not authorized to control this bot.", [from_user_id])
         except Exception:
             pass
         return
@@ -108,7 +96,7 @@ def process_command(cl, text, from_user_id, thread_id, processed_set):
     if cmd == ".ping":
         t0 = time.time()
         try:
-            cl.direct_send(text="pong", user_ids=[from_user_id])
+            cl.direct_send("pong", [from_user_id])
             latency = (time.time() - t0) * 1000.0
             print(f"[+] Replied pong ({int(latency)} ms)")
         except Exception as e:
@@ -120,13 +108,12 @@ def process_command(cl, text, from_user_id, thread_id, processed_set):
         help_text = (
             "Demo bot commands:\n"
             ".ping - check bot is alive\n"
-            ".spam <count> <text> - send <text> <count> times (count<=%d)\n"
-            ".like <username> <n> - like <n> recent posts of <username> (n<=%d)\n"
+            f".spam <count> <text> - send text (count <= {MAX_SPAM})\n"
+            f".like <username> <n> - like <n> posts (n <= {MAX_LIKES})\n"
             ".help - show this message\n"
-            "NOTE: Use responsibly on a test account only."
-        ) % (MAX_SPAM, MAX_LIKES)
+        )
         try:
-            cl.direct_send(text=help_text, user_ids=[from_user_id])
+            cl.direct_send(help_text, [from_user_id])
         except Exception as e:
             print("Error sending help:", e)
         return
@@ -134,29 +121,20 @@ def process_command(cl, text, from_user_id, thread_id, processed_set):
     # .spam
     if cmd == ".spam":
         if len(parts) < 3:
-            try:
-                cl.direct_send(text="Usage: .spam <count> <text>", user_ids=[from_user_id])
-            except Exception:
-                pass
+            cl.direct_send("Usage: .spam <count> <text>", [from_user_id])
             return
         try:
             count = int(parts[1])
         except ValueError:
-            try:
-                cl.direct_send(text="Count must be a number.", user_ids=[from_user_id])
-            except Exception:
-                pass
+            cl.direct_send("Count must be a number.", [from_user_id])
             return
         if count < 1 or count > MAX_SPAM:
-            try:
-                cl.direct_send(text=f"Count out of allowed range (1..{MAX_SPAM}).", user_ids=[from_user_id])
-            except Exception:
-                pass
+            cl.direct_send(f"Count out of range (1..{MAX_SPAM})", [from_user_id])
             return
         message = " ".join(parts[2:])
         for i in range(count):
             try:
-                cl.direct_send(text=message, user_ids=[from_user_id])
+                cl.direct_send(message, [from_user_id])
                 print(f"[+] Spam sent ({i+1}/{count})")
             except Exception as e:
                 print("Error during spam send:", e)
@@ -167,109 +145,70 @@ def process_command(cl, text, from_user_id, thread_id, processed_set):
     # .like
     if cmd == ".like":
         if len(parts) < 3:
-            try:
-                cl.direct_send(text="Usage: .like <username> <n>", user_ids=[from_user_id])
-            except Exception:
-                pass
+            cl.direct_send("Usage: .like <username> <n>", [from_user_id])
             return
         target = parts[1]
         try:
             n = int(parts[2])
         except ValueError:
-            try:
-                cl.direct_send(text="n must be a number.", user_ids=[from_user_id])
-            except Exception:
-                pass
+            cl.direct_send("n must be a number.", [from_user_id])
             return
         if n < 1 or n > MAX_LIKES:
-            try:
-                cl.direct_send(text=f"n out of allowed range (1..{MAX_LIKES}).", user_ids=[from_user_id])
-            except Exception:
-                pass
+            cl.direct_send(f"n out of range (1..{MAX_LIKES})", [from_user_id])
             return
         try:
             uid = cl.user_id_from_username(target)
-        except Exception as e:
-            try:
-                cl.direct_send(text=f"Could not resolve user {target}.", user_ids=[from_user_id])
-            except Exception:
-                pass
-            print("Lookup error:", e)
-            return
-        try:
             medias = cl.user_medias(uid, amount=n)
         except Exception as e:
-            try:
-                cl.direct_send(text=f"Could not fetch medias for {target}.", user_ids=[from_user_id])
-            except Exception:
-                pass
-            print("Fetch medias error:", e)
+            cl.direct_send(f"Error fetching {target}'s posts.", [from_user_id])
+            print("Lookup error:", e)
             return
         liked = 0
         for m in medias:
             try:
                 if cl.media_like(m.pk):
                     liked += 1
-                    print(f"[+] Liked media {m.pk}")
-                else:
-                    print(f"[-] Already liked or failed for {m.pk}")
+                    print(f"[+] Liked {m.pk}")
             except Exception as e:
                 print("Error liking:", e)
             human_sleep(3, 8)
-        try:
-            cl.direct_send(text=f"Liked {liked}/{len(medias)} posts of {target}.", user_ids=[from_user_id])
-        except Exception:
-            pass
+        cl.direct_send(f"Liked {liked}/{len(medias)} posts of {target}.", [from_user_id])
         return
 
-    # Unknown command
-    try:
-        cl.direct_send(text="Unknown command. Send .help for list.", user_ids=[from_user_id])
-    except Exception:
-        pass
+    # Unknown
+    cl.direct_send("Unknown command. Send .help", [from_user_id])
 
 def poll_inbox_and_handle(cl):
     processed = load_processed()
     print(f"[*] Loaded {len(processed)} processed message IDs.")
     while True:
         try:
-            # Fetch recent direct threads
-            threads = cl.direct_threads()
+            threads = cl.direct_threads(amount=5)  # latest 5
             for thread in threads:
-                # each thread may have `items` (messages)
-                items = getattr(thread, "items", None) or getattr(thread, "items_v2", None) or []
-                for item in items:
-                    # attempt to get unique message id
-                    msg_id = getattr(item, "id", None) or getattr(item, "item_id", None) or None
-                    if not msg_id:
-                        continue
-                    if msg_id in processed:
+                msgs = getattr(thread, "messages", []) or getattr(thread, "items", [])
+                for msg in msgs:
+                    msg_id = getattr(msg, "id", None)
+                    if not msg_id or msg_id in processed:
                         continue
 
-                    text = getattr(item, "text", None)
-                    user_id = getattr(item, "user_id", None) or getattr(item, "sender_id", None) or getattr(item, "user", None)
-                    # In some cases user object exists
-                    if isinstance(user_id, dict):
-                        user_id = user_id.get("pk") or user_id.get("id")
+                    text = getattr(msg, "text", None)
+                    user_id = getattr(msg, "user_id", None) or getattr(msg, "sender_id", None)
 
-                    # Only process textual DMs starting with dot
                     if text and text.strip().startswith("."):
-                        process_command(cl, text, user_id, thread.id, processed)
+                        process_command(cl, text, user_id, processed)
 
-                    # mark processed regardless to avoid reprocessing
                     processed.add(msg_id)
 
             save_processed(processed)
         except Exception as e:
             print("[!] Inbox polling error:", e)
 
-        # sleep between polls
         time.sleep(POLL_INTERVAL + random.uniform(0, 3))
 
 def main():
     print("=== Instagram DM command-bot (demo) ===")
     cl = login_or_load_session()
-    human_sleep(1,3)
+    human_sleep(1, 3)
     print("[*] Starting inbox polling. Press Ctrl+C to stop.")
     try:
         poll_inbox_and_handle(cl)
