@@ -23,7 +23,7 @@ PROCESSED_FILE = "processed_msgs.json"
 
 POLL_INTERVAL = 12             # seconds between inbox polls
 AUTHORIZED_USERS = [           # allowed usernames (without @)
-    "abhi.9_8_"
+    "abhi_9_8__"
 ]
 
 MAX_SPAM = 5                   # max messages allowed for .spam
