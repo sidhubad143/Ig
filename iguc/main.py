@@ -1,4 +1,3 @@
-# iguc/main.py
 import os
 import json
 import time
@@ -67,7 +66,6 @@ def reset_like_history_if_needed():
 # Login handling
 def login_or_load_session():
     cl = Client()
-    # ensure session dir exists
     os.makedirs(os.path.dirname(SESSION_FILE), exist_ok=True)
     if os.path.exists(SESSION_FILE):
         try:
@@ -89,14 +87,13 @@ def login_or_load_session():
         print("[!] Couldn't save session:", e)
     return cl
 
-# Plugin loader: import all modules from iguc.plugins
+# Plugin loader
 def load_plugins():
     plugins = {}
     package = importlib.import_module(PLUGINS_PACKAGE)
-    for finder, name, ispkg in pkgutil.iter_modules(package.__path__, package.__name__ + "."):
+    for _, name, _ in pkgutil.iter_modules(package.__path__, package.__name__ + "."):
         try:
             mod = importlib.import_module(name)
-            # plugin modules must expose: COMMAND (string) and handle(cl, from_user_id, args, context) function
             cmd = getattr(mod, "COMMAND", None)
             handler = getattr(mod, "handle", None)
             if cmd and callable(handler):
@@ -123,8 +120,10 @@ def main():
                         msg_id = getattr(msg, "id", None)
                         if not msg_id or msg_id in processed:
                             continue
+
                         text = getattr(msg, "text", None)
                         user_id = getattr(msg, "user_id", None) or getattr(msg, "sender_id", None)
+
                         if text and text.strip().startswith("."):
                             parts = text.strip().split()
                             cmd = parts[0].lower().lstrip(".")
@@ -142,27 +141,24 @@ def main():
                                 "like_delay_min": LIKE_DELAY_MIN,
                                 "like_delay_max": LIKE_DELAY_MAX
                             }
-                            # if plugin exists - call it
                             if plugin:
                                 try:
                                     plugin.handle(cl, user_id, args, context)
                                 except Exception as e:
                                     print("[!] Plugin handler error for", cmd, e)
-                            else:
-                                # unknown commands: reply generic help
-                                try:
-                                    cl.direct_send("Unknown command. Send .help", [user_id])
-                                except Exception:
-                                    pass
-                        # mark processed
+                            # else ignore (no "unknown command" spam)
+
+                        # always mark processed
                         processed.add(msg_id)
-                # persist processed set
+
                 save_json(PROCESSED_FILE, list(processed))
+
             except Exception as e:
                 print("[!] Inbox polling error:", e)
-                # cooldown on error
                 time.sleep(120)
+
             time.sleep(POLL_INTERVAL + random.uniform(0, 5))
+
     except KeyboardInterrupt:
         print("\nExiting (keyboard interrupt).")
 
